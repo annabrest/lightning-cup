@@ -99,9 +99,6 @@ html,body{height:100%;overflow:hidden;background:var(--night);color:var(--chalk)
   </div>
 </div>
 
-<!-- Offline: put phaser.min.js in the same folder as this file. If it's missing, it loads from the internet instead. -->
-<script src="phaser.min.js"></script>
-<script>if(!window.Phaser)document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"><\/script>');</script>
 <script>
 (() => {
 // ---------- world & pitch (meters) ----------
@@ -636,7 +633,7 @@ function drawBall(g){
 // ---------- Phaser scene ----------
 let dyn, cam;
 function fitZoom(){ if (!cam) return; cam.setZoom(clamp(Math.min(cam.height / 760, cam.width / 1150), 0.42, 1.5)); }
-class Match extends Phaser.Scene {
+const makeMatch = () => class Match extends Phaser.Scene {
   create(){
     drawPitch(this);
     dyn = this.add.graphics();
@@ -657,7 +654,7 @@ class Match extends Phaser.Scene {
     for (const [, p] of ents) p ? drawPlayer(dyn, p) : drawBall(dyn);
     hud();
   }
-}
+};
 
 // ---------- controls ----------
 const zone = $('#stickZone'), base = $('#stickBase'), knob = $('#knob');
@@ -708,14 +705,23 @@ function start(){
 }
 $('#go').addEventListener('click', start);
 
-const fontsReady = document.fonts ? Promise.race([document.fonts.load('28px Bungee'), new Promise(r => setTimeout(r, 1500))]) : Promise.resolve();
-fontsReady.catch(() => {}).then(() => {
-  new Phaser.Game({
-    type: Phaser.AUTO, parent: 'game', backgroundColor: '#0f1d16',
-    scale: { mode: Phaser.Scale.RESIZE, width: '100%', height: '100%' },
-    render: { antialias: true }, scene: Match
-  });
-});
+// Load the game engine: phaser.min.js next to this file first, the internet as a backup.
+function loadScript(src){ return new Promise((ok, fail) => { const el = document.createElement('script'); el.src = src; el.onload = () => window.Phaser ? ok() : fail(); el.onerror = fail; document.head.appendChild(el); }); }
+function engineMissing(){
+  $('#mHelp').innerHTML = '<li>⚠️ The game engine didn\'t load. Put <b>phaser.min.js</b> in the same folder as this page, or connect to the internet, then reload.</li>';
+  $('#go').disabled = true; $('#go').textContent = 'ENGINE MISSING';
+}
+const fontsReady = document.fonts ? Promise.race([document.fonts.load('28px Bungee'), new Promise(r => setTimeout(r, 1500))]).catch(() => {}) : Promise.resolve();
+loadScript('phaser.min.js')
+  .catch(() => loadScript('https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js'))
+  .then(() => fontsReady)
+  .then(() => {
+    new Phaser.Game({
+      type: Phaser.AUTO, parent: 'game', backgroundColor: '#0f1d16',
+      scale: { mode: Phaser.Scale.RESIZE, width: '100%', height: '100%' },
+      render: { antialias: true }, scene: makeMatch()
+    });
+  }, engineMissing);
 })();
 </script>
 
