@@ -594,12 +594,17 @@ function drawPitch(scene){
     [0xffd23f, '#0b2a6e', 'LIGHTNING CUP'], [0x1f5fe0, '#ffd23f', 'BLU ⚡ VS RED'],
     [0xf4f7f2, '#0e1a14', 'DESIGNED BY ITAI'], [0xd8393a, '#ffffff', '11 v 11 FOOTBALL']
   ];
-  const bw = 560, by = MT - 100, bh = 48;
+  const bw = 560, by = MT - 100, bh = 48, labels = [];
   for (let i = 0, x = 0; x < WW; i++, x += bw) {
     const b = boards[i % boards.length];
     g.fillStyle(b[0], 1); g.fillRect(x + 2, by, bw - 4, bh);
-    scene.add.text(x + bw / 2, by + bh / 2, b[2], { fontFamily:'Bungee, Impact, sans-serif', fontSize:'28px', color:b[1] }).setOrigin(0.5);
+    labels.push([x + bw / 2, by + bh / 2, b[2], b[1]]);
   }
+  // Draw the stadium once into a picture, so it isn't redrawn every frame
+  g.generateTexture('stadium', WW, WH); g.destroy();
+  scene.add.image(0, 0, 'stadium').setOrigin(0, 0);
+  for (const [x, y, txt, col] of labels)
+    scene.add.text(x, y, txt, { fontFamily:'Bungee, Impact, sans-serif', fontSize:'28px', color:col }).setOrigin(0.5);
 }
 const BOLT = [[2,-40],[-4,-31],[0,-31],[-3,-23],[5,-33],[1,-33],[4,-40]];
 function drawPlayer(g, p){
@@ -644,9 +649,10 @@ const makeMatch = () => class Match extends Phaser.Scene {
     kickoff(teams[0]); state = 'menu'; banner.hidden = true;
     cam.centerOn(sx(52.5), sy(34));
   }
-  update(_, delta){
-    const dt = Math.min(delta / 1000, 0.05);
-    step(dt);
+  update(){
+    const now = performance.now(), real = this.last ? (now - this.last) / 1000 : 1 / 60; this.last = now;
+    let left = Math.min(real, 0.1), dt = left;   // real time, not Phaser's smoothed delta
+    while (left > 0) { const h = Math.min(left, 1 / 60); step(h); left -= h; }
     const owner = ball.owner, look = owner ? owner.team.dir * 110 : ball.vx * 4;
     const tx = sx(ball.x) + look - cam.width / 2, ty = sy(ball.y) - 60 - cam.height / 2, k = Math.min(1, dt * 4);
     cam.scrollX += (tx - cam.scrollX) * k; cam.scrollY += (ty - cam.scrollY) * k;
